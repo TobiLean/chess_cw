@@ -1,6 +1,7 @@
 import numpy as np
 import time
 import logging
+import keyboard
 from Arm_Lib import Arm_Device
 
 class DofbotChessController:
@@ -16,6 +17,89 @@ class DofbotChessController:
         self.SQUARE_WIDTH = self.BOARD_WIDTH / 8
         self.SQUARE_HEIGHT = self.BOARD_LENGTH / 8
 
+        # Predefined precise coordinates for known squares
+        self.PRECISE_COORDINATES = {
+            'h1': (54, 140, -30, 30, 270, 176),
+            'g1': (62, 140, -30, 25, 270, 176),
+            'f1': (72, 140, -30, 25, 270, 176),
+            'e1': (82, 140, -30, 25, 270, 176),
+            'd1': (94, 140, -30, 25, 270, 176),
+            'c1': (106, 140, -30, 25, 270, 176),
+            'b1': (116, 140, -30, 25, 270, 176),
+            'a1': (124, 140, -30, 30, 270, 176),
+
+            # Second Row
+            'h2': (60, 120, -20, 35, 270, 176),
+            'g2': (68, 120, -25, 40, 270, 176),
+            'f2': (76, 120, -30, 45, 270, 176),
+            'e2': (84, 120, -35, 50, 270, 176),
+            'd2': (92, 120, -40, 55, 270, 176),
+            'c2': (100, 120, -45, 60, 270, 176),
+            'b2': (108, 120, -50, 65, 270, 176),
+            'a2': (120, 120, -20, 35, 270, 176),
+
+            # Third Row
+            'h3': (62, 120, -40, 65, 270, 176),
+            'g3': (70, 120, -45, 70, 270, 176),
+            'f3': (78, 120, -50, 75, 270, 176),
+            'e3': (86, 120, -55, 80, 270, 176),
+            'd3': (94, 120, -60, 85, 270, 176),
+            'c3': (102, 120, -65, 90, 270, 176),
+            'b3': (110, 120, -70, 95, 270, 176),
+            'a3': (116, 120, -40, 65, 270, 176),
+
+            # Fourth Row
+            'h4': (64, 100, -35, 90, 270, 176),
+            'g4': (72, 100, -40, 95, 270, 176),
+            'f4': (80, 100, -45, 100, 270, 176),
+            'e4': (88, 100, -50, 105, 270, 176),
+            'd4': (96, 100, -55, 110, 270, 176),
+            'c4': (104, 100, -60, 115, 270, 176),
+            'b4': (112, 100, -65, 120, 270, 176),
+            'a4': (112, 100, -35, 90, 270, 176),
+
+            # Fifth Row
+            'h5': (66, 90, -30, 95, 270, 176),
+            'g5': (74, 90, -35, 100, 270, 176),
+            'f5': (82, 90, -40, 105, 270, 176),
+            'e5': (90, 90, -45, 110, 270, 176),
+            'd5': (98, 90, -50, 115, 270, 176),
+            'c5': (106, 90, -55, 120, 270, 176),
+            'b5': (114, 90, -60, 125, 270, 176),
+            'a5': (110, 90, -30, 95, 270, 176),
+
+            # Sixth Row
+            'h6': (68, 75, -25, 110, 270, 176),
+            'g6': (76, 75, -30, 115, 270, 176),
+            'f6': (84, 75, -35, 120, 270, 176),
+            'e6': (92, 75, -40, 125, 270, 176),
+            'd6': (100, 75, -45, 130, 270, 176),
+            'c6': (108, 75, -50, 135, 270, 176),
+            'b6': (116, 75, -55, 140, 270, 176),
+            'a6': (108, 75, -25, 110, 270, 176),
+
+            # Seventh Row
+            'h7': (70, 60, -20, 125, 270, 176),
+            'g7': (78, 60, -25, 130, 270, 176),
+            'f7': (86, 60, -30, 135, 270, 176),
+            'e7': (94, 60, -35, 140, 270, 176),
+            'd7': (102, 60, -40, 145, 270, 176),
+            'c7': (110, 60, -45, 150, 270, 176),
+            'b7': (118, 60, -50, 155, 270, 176),
+            'a7': (106, 60, -20, 125, 270, 176),
+
+            # Eighth Row (Bottom Row)
+            'h8': (72, 50, -15, 135, 270, 176),
+            'g8': (78, 50, -15, 135, 270, 176),
+            'f8': (82, 50, -15, 135, 270, 176),
+            'e8': (88, 50, -15, 135, 270, 176),
+            'd8': (92, 50, -15, 135, 270, 176),
+            'c8': (96, 50, -15, 135, 270, 176),
+            'b8': (102, 50, -15, 135, 270, 176),
+            'a8': (106, 50, -15, 135, 270, 176)
+            
+        }
+
         # Logging configuration
         logging.basicConfig(
             level=logging.INFO, 
@@ -25,169 +109,208 @@ class DofbotChessController:
         # Arm connection
         self.arm = Arm_Device()
         
-        # Generate coordinates AFTER all attributes are set
-        self.board_coordinates = self._generate_board_coordinates()
+        # Generate coordinates by filling in the gaps
+        #self.board_coordinates = self._generate_board_coordinates()
         
         # Debug print of board coordinates
-        print("Generated Board Coordinates:")
-        for square, coords in self.board_coordinates.items():
+        print("Board Coordinates:")
+        for square, coords in self.PRECISE_COORDINATES.items():
             print(f"{square}: {coords}")
-    
-    def turn_on_torque(self, enable):
-        if enable == 0:
-            self.arm.Arm_serial_set_torque(0)
-            print("Torque off")
-        elif enable == 1:
-            self.arm.Arm_serial_set_torque(1)
-            print("Torque on")
 
     def _generate_board_coordinates(self):
         """
-        Simplified coordinate mapping for chess squares
+        Generate board coordinates by interpolating between known points
+        and using precise pre-defined coordinates where available
         """
         coordinates = {}
         files = 'ABCDEFGH'
         ranks = range(1, 9)
         
-        # Predefined origin servo angles
-        origin_angles = {
-            1: 53,   # Base Rotation
-            2: 117,  # Shoulder
-            3: -10,  # Elbow
-            4: 9,    # Wrist Horizontal
-            5: 89,   # Wrist Rotation
-            6: 122   # Gripper
-        }
-        
         for file_index, file in enumerate(files):
             for rank_index, rank in enumerate(ranks):
                 square_name = f"{file}{rank}"
                 
-                # Simple coordinate calculation
-                coordinates[square_name] = {
-                    'servo_angles': {
-                        1: origin_angles[1] + (7 - file_index) * 5,  # Adjust base rotation
-                        2: origin_angles[2],
-                        3: origin_angles[3],
-                        4: origin_angles[4],
-                        5: origin_angles[5],
-                        6: origin_angles[6]
-                    },
-                    'board_coords': (
-                        (7 - file_index) * (self.BOARD_WIDTH / 8),
-                        rank_index * (self.BOARD_LENGTH / 8),
-                        0
-                    )
-                }
+                # Check if we have a precise coordinate for this square
+                if square_name in self.PRECISE_COORDINATES:
+                    precise_angles = self.PRECISE_COORDINATES[square_name]
+                    coordinates[square_name] = {
+                        'servo_angles': {
+                            1: precise_angles[0],
+                            2: precise_angles[1],
+                            3: precise_angles[2],
+                            4: precise_angles[3],
+                            5: precise_angles[4],
+                            6: precise_angles[5]
+                        },
+                        'board_coords': (
+                            (7 - file_index) * (self.BOARD_WIDTH / 8),
+                            rank_index * (self.BOARD_LENGTH / 8),
+                            0
+                        )
+                    }
+                else:
+                    # Interpolation for missing squares using a simple algorithm
+                    # This is a placeholder and should be refined with actual measurements
+                    base_angle = 53 + (7 - file_index) * 5
+                    shoulder_base = 117
+                    elbow_base = -10
+                    
+                    coordinates[square_name] = {
+                        'servo_angles': {
+                            1: base_angle,
+                            2: shoulder_base + (-rank_index * 2),
+                            3: elbow_base + (-rank_index * 2),
+                            4: 9,  # Placeholder - needs precise measurement
+                            5: 89,  # Placeholder - needs precise measurement
+                            6: 122  # Gripper position
+                        },
+                        'board_coords': (
+                            (7 - file_index) * (self.BOARD_WIDTH / 8),
+                            rank_index * (self.BOARD_LENGTH / 8),
+                            0
+                        )
+                    }
         
         return coordinates
 
     def test_h1_to_g1_movement(self):
         """
-        Comprehensive movement and diagnostic test
+        Comprehensive movement and diagnostic test from H1 to G1
+        
+        This method demonstrates:
+        1. Retrieving precise coordinates for H1 and G1
+        2. Performing a movement test between these squares
+        3. Providing detailed logging and error handling
         """
         try:
-            # Explicitly print out h1 and g1 details
+            # Validate and log details for H1
             print("H1 Details:")
-            h1_details = self.board_coordinates.get('h1'.upper())
+            h1_details = self.board_coordinates.get('H1')
             if h1_details is None:
-                raise ValueError("No coordinates found for h1")
+                raise ValueError("No coordinates found for H1")
             
-            print("H1 Servo Angles:", h1_details.get('servo_angles', 'No angles found'))
-            print("H1 Board Coordinates:", h1_details.get('board_coords', 'No coordinates found'))
+            h1_servo_angles = h1_details.get('servo_angles', {})
+            h1_board_coords = h1_details.get('board_coords', 'No coordinates found')
             
+            print("H1 Servo Angles:", h1_servo_angles)
+            print("H1 Board Coordinates:", h1_board_coords)
+            
+            # Validate and log details for G1
             print("\nG1 Details:")
-            g1_details = self.board_coordinates.get('g1'.upper())
+            g1_details = self.board_coordinates.get('G1')
             if g1_details is None:
-                raise ValueError("No coordinates found for g1")
+                raise ValueError("No coordinates found for G1")
             
-            print("G1 Servo Angles:", g1_details.get('servo_angles', 'No angles found'))
-            print("G1 Board Coordinates:", g1_details.get('board_coords', 'No coordinates found'))
+            g1_servo_angles = g1_details.get('servo_angles', {})
+            g1_board_coords = g1_details.get('board_coords', 'No coordinates found')
             
-            # Move to g1
+            print("G1 Servo Angles:", g1_servo_angles)
+            print("G1 Board Coordinates:", g1_board_coords)
+            
+            # Validate servo angles
+            required_servos = [1, 2, 3, 4, 5, 6]
+            for servo in required_servos:
+                if servo not in h1_servo_angles or servo not in g1_servo_angles:
+                    raise ValueError(f"Missing servo angle for servo {servo}")
+            
+            # Move to G1
             print("\nMoving to G1...")
-            g1_angles = g1_details['servo_angles']
-            for servo, angle in g1_angles.items():
+            for servo, angle in g1_servo_angles.items():
                 print(f"Moving Servo {servo} to {angle} degrees")
                 self.arm.Arm_serial_servo_write(servo, angle, self.MOVEMENT_SPEED)
             
             time.sleep(2)  # Allow movement to complete
             
-            # Log position after moving to g1
-            print("\nPosition after moving to G1:")
-            self.log_current_arm_position()
-            
-            # Move back to h1
+            # Move back to H1
             print("\nMoving back to H1...")
-            h1_angles = h1_details['servo_angles']
-            for servo, angle in h1_angles.items():
+            for servo, angle in h1_servo_angles.items():
                 print(f"Moving Servo {servo} to {angle} degrees")
                 self.arm.Arm_serial_servo_write(servo, angle, self.MOVEMENT_SPEED)
             
             time.sleep(2)  # Allow movement to complete
             
-            # Final position check
-            print("\nFinal Position (back to H1):")
-            self.log_current_arm_position()
+            print("\nMovement test completed successfully.")
         
         except Exception as e:
             print(f"Movement test failed: {e}")
             import traceback
             traceback.print_exc()
             
-    def test_h2_movement(self):
+    def move_to_cell(self, cell_id):
         """
-        Comprehensive movement test to H2 square
+        Move the robot arm to a specific chess board cell using Arm_serial_servo_write6.
+        
+        This method provides a flexible way to navigate to any cell on the chessboard
+        with optimized servo movement.
+        
+        Parameters:
+        -----------
+        cell_id : str
+            The chess board cell identifier (e.g., 'A1', 'H8', 'E4')
+            Must be a valid chess notation cell name
+        
+        Behavior:
+        ---------
+        - If the cell exists in PRECISE_COORDINATES, moves to that cell
+        - If the cell does not exist, prints an error message
+        - Validates cell notation before attempting movement
         """
+        # Normalize cell ID to uppercase for consistent lookup
+        cell_id = cell_id.lower()
+        
+        # Basic validation of chess notation
+        if len(cell_id) != 2:
+            print(f"Error: Invalid cell notation '{cell_id}'. Must be two characters (e.g., 'A1', 'H8').")
+            return
+        
+        # Check if first character is a valid file (A-H)
+        if cell_id[0] not in 'abcdefgh':
+            print(f"Error: Invalid file '{cell_id[0]}'. Must be a-h.")
+            return
+        
+        # Check if second character is a valid rank (1-8)
+        if cell_id[1] not in '12345678':
+            print(f"Error: Invalid rank '{cell_id[1]}'. Must be 1-8.")
+            return
+        
+        # Check if cell exists in precise coordinates
+        if cell_id not in self.PRECISE_COORDINATES:
+            print(f"Error: No precise coordinates found for cell '{cell_id}'.")
+            print("Available cells in precise coordinates:")
+            for available_cell in sorted(self.PRECISE_COORDINATES.keys()):
+                print(available_cell, end=', ')
+            print("\n")
+            return
+        
+        # Retrieve precise coordinates for the cell
+        cell_coordinates = self.PRECISE_COORDINATES[cell_id]
+        
         try:
-            # Explicitly print out h1 and h2 details
-            print("H1 Details:")
-            h1_details = self.board_coordinates.get('H1')
-            if h1_details is None:
-                raise ValueError("No coordinates found for h1")
+            # Prepare servo angles for Arm_serial_servo_write6
+            # The method expects angles for all 6 servos in order
+            servo_angles = list(cell_coordinates)
             
-            print("H1 Servo Angles:", h1_details.get('servo_angles', 'No angles found'))
-            print("H1 Board Coordinates:", h1_details.get('board_coords', 'No coordinates found'))
+            print(f"\nMoving to cell {cell_id}...")
+            print(f"Servo Angles: {servo_angles}")
             
-            print("\nH2 Details:")
-            h2_details = self.board_coordinates.get('H2')
-            if h2_details is None:
-                raise ValueError("No coordinates found for h2")
-            
-            print("H2 Servo Angles:", h2_details.get('servo_angles', 'No angles found'))
-            print("H2 Board Coordinates:", h2_details.get('board_coords', 'No coordinates found'))
-            
-            # Move to h2
-            print("\nMoving to H2...")
-            h2_angles = h2_details['servo_angles']
-            for servo, angle in h2_angles.items():
-                print(f"Moving Servo {servo} to {angle} degrees")
-                self.arm.Arm_serial_servo_write(servo, angle, self.MOVEMENT_SPEED)
+            # Use Arm_serial_servo_write6 for simultaneous servo movement
+            # Parameters: servo1, servo2, servo3, servo4, servo5, servo6, speed
+            self.arm.Arm_serial_servo_write6(
+                servo_angles[0],  # Servo 1 (Base Rotation)
+                servo_angles[1],  # Servo 2 (Shoulder)
+                servo_angles[2],  # Servo 3 (Elbow)
+                servo_angles[3],  # Servo 4 (Wrist Horizontal)
+                servo_angles[4],  # Servo 5 (Wrist Rotation)
+                servo_angles[5],  # Servo 6 (Gripper)
+                self.MOVEMENT_SPEED  # Movement speed
+            )
             
             time.sleep(2)  # Allow movement to complete
             
-            # Log position after moving to h2
-            print("\nPosition after moving to H2:")
-            self.log_current_arm_position()
-            
-            # Optional: Move back to home or h1
-            print("\nMoving back to initial position...")
-            # Move back to h1
-            print("\nMoving back to H1...")
-            h1_angles = h1_details['servo_angles']
-            for servo, angle in h1_angles.items():
-                print(f"Moving Servo {servo} to {angle} degrees")
-                self.arm.Arm_serial_servo_write(servo, angle, self.MOVEMENT_SPEED)
-            
-            time.sleep(2)  # Allow movement to complete
-            
-            # Final position check
-            print("\nFinal Position (back to H1):")
-            self.log_current_arm_position()
-            del self.arm
-            
+            print(f"Successfully moved to cell {cell_id}.")
+        
         except Exception as e:
-            print(f"Movement test failed: {e}")
+            print(f"Error during movement to {cell_id}: {e}")
             import traceback
             traceback.print_exc()
 
@@ -576,7 +699,23 @@ class DofbotChessController:
         
         time.sleep(1)  # Ensure position is reached
         logging.info("Robot moved to custom home position")
-    
+
+    def iterate_chessboard(self):
+        files = 'HGFEDCBA'
+        ranks = range(1, 9)
+
+        # Iterate through each rank
+        for rank in ranks:
+            # Determine the order for files based on the rank
+            file_order = files if rank % 2 == 1 else files[::-1]
+
+            # Iterate through each file in the determined order
+            for file in file_order:
+                cell = f"{file}{rank}"
+                print(f"Current cell: {cell}")
+                self.move_to_cell(cell)
+                input("Press space to continue...")  # Wait for space key press to move to the next cell
+
             
 def test_initialization():
     """
@@ -609,11 +748,12 @@ if __name__ == "__main__":
     
     # controller.test_movement_precision()
     
-    # controller.turn_on_torque(1)
+    #controller.move_to_cell('h1')
+    
+    # Iterate through chessboard
+    controller.iterate_chessboard()
     
     # controller.test_h1_to_g1_movement()
     
     # controller.log_current_arm_position()
-()
-    
     
